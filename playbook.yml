@@ -1,0 +1,84 @@
+---
+- name: Provision Ubuntu VM with Java and Tomcat
+  hosts: all
+  become: true
+
+  tasks:
+    - name: Update apt package cache
+      ansible.builtin.apt:
+        update_cache: yes
+
+    - name: Install OpenJDK 11
+      ansible.builtin.apt:
+        name: openjdk-11-jdk
+        state: present
+
+    - name: Set JAVA_HOME environment variable
+      ansible.builtin.lineinfile:
+        path: /etc/environment
+        line: 'JAVA_HOME="/usr/lib/jvm/java-11-openjdk-amd64"'
+        state: present
+        create: yes
+        regexp: '^JAVA_HOME='
+
+    - name: Download Apache Tomcat 9
+      ansible.builtin.get_url:
+        url: https://archive.apache.org/dist/tomcat/tomcat-9/v9.0.88/bin/apache-tomcat-9.0.88.tar.gz
+        dest: /tmp/apache-tomcat-9.0.88.tar.gz
+        mode: '0644'
+
+    - name: Create Tomcat installation directory
+      ansible.builtin.file:
+        path: /opt/tomcat
+        state: directory
+        mode: '0755'
+
+    - name: Extract Apache Tomcat archive
+      ansible.builtin.unarchive:
+        src: /tmp/apache-tomcat-9.0.88.tar.gz
+        dest: /opt/tomcat
+        remote_src: yes
+        extra_opts: [--strip-components=1]
+
+    - name: Set ownership for Tomcat directory
+      ansible.builtin.file:
+        path: /opt/tomcat
+        owner: vagrant
+        group: vagrant
+        recurse: yes
+
+    - name: Create Tomcat systemd service file
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/tomcat.service
+        content: |
+          [Unit]
+          Description=Apache Tomcat Web Application Container
+          After=network.target
+
+          [Service]
+          Type=forking
+          Environment="JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64"
+          Environment="CATALINA_PID=/opt/tomcat/temp/tomcat.pid"
+          Environment="CATALINA_HOME=/opt/tomcat"
+          Environment="CATALINA_BASE=/opt/tomcat"
+          ExecStart=/opt/tomcat/bin/startup.sh
+          ExecStop=/opt/tomcat/bin/shutdown.sh
+          User=vagrant
+          Group=vagrant
+          UMask=0007
+          RestartSec=10
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+
+    - name: Reload systemd to recognize new service
+      ansible.builtin.systemd:
+        daemon_reload: yes
+
+    - name: Enable and start Tomcat service
+      ansible.builtin.systemd:
+        name: tomcat
+        state: started
+        enabled: yes
