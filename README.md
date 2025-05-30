@@ -26,6 +26,7 @@ This project provisions a virtual machine using **Vagrant** and **Ansible** to a
 git clone https://github.com/mr3bd/tomcat-ansible-vagrant-setup.git
 cd tomcat-ansible-vagrant-setup
 vagrant up
+```
 
 ##  Access
 
